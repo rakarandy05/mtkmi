@@ -1,0 +1,442 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Shield, 
+  Activity, 
+  Map as MapIcon, 
+  Camera, 
+  AlertTriangle, 
+  Database, 
+  Cpu, 
+  Radio, 
+  TrendingUp, 
+  Maximize2,
+  Box,
+  HardHat,
+  Zap,
+  Globe,
+  MapPin,
+  Crosshair,
+  List,
+  ArrowRight
+} from 'lucide-react';
+
+// --- Updated Dummy Data (Total 11 Site Sekolah Nasional) ---
+const PROJECTS = [
+  { id: 'SCH-2024-001', name: 'SMA Negeri 1 Jakarta', status: 'ACTIVE', progress: 68, region: 'Jakarta', coords: { x: 195, y: 285 }, lastUpdate: '10:45:01', health: '98%', cameras: { active: 4, offline: 0 } },
+  { id: 'SCH-2024-012', name: 'SDN 05 Merauke (3T)', status: 'ANOMALY', progress: 42, region: 'Papua', coords: { x: 740, y: 310 }, lastUpdate: '10:44:20', health: '72%', cameras: { active: 3, offline: 1 } },
+  { id: 'SCH-2024-088', name: 'SMK 2 Biak', status: 'OFFLINE', progress: 15, region: 'Papua', coords: { x: 680, y: 220 }, lastUpdate: '09:12:05', health: '0%', cameras: { active: 0, offline: 4 } },
+  { id: 'SCH-3T-001', name: 'SDN 01 Sabang (3T)', status: 'ACTIVE', progress: 95, region: 'Aceh', coords: { x: 50, y: 80 }, lastUpdate: '10:50:12', health: '100%', cameras: { active: 4, offline: 0 } },
+  { id: 'SCH-N3T-042', name: 'SMP Negeri 1 Solo', status: 'ACTIVE', progress: 82, region: 'Jawa Tengah', coords: { x: 250, y: 310 }, lastUpdate: '10:48:55', health: '95%', cameras: { active: 4, offline: 0 } },
+  { id: 'SCH-N3T-099', name: 'SMA Negeri 3 Medan', status: 'ANOMALY', progress: 55, region: 'Sumatera Utara', coords: { x: 100, y: 150 }, lastUpdate: '10:52:30', health: '85%', cameras: { active: 2, offline: 2 } },
+  { id: 'SCH-3T-007', name: 'SDN Korowai (3T)', status: 'OFFLINE', progress: 5, region: 'Papua Selatan', coords: { x: 720, y: 340 }, lastUpdate: '07:00:00', health: '0%', cameras: { active: 0, offline: 4 } },
+  { id: 'SCH-3T-009', name: 'SDN 01 Merauke (3T)', status: 'ACTIVE', progress: 88, region: 'Papua', coords: { x: 755, y: 330 }, lastUpdate: '11:05:00', health: '99%', cameras: { active: 4, offline: 0 } },
+  { id: 'SCH-N3T-055', name: 'SMPN 2 Balikpapan', status: 'ACTIVE', progress: 75, region: 'Kalimantan Timur', coords: { x: 420, y: 200 }, lastUpdate: '11:02:15', health: '92%', cameras: { active: 3, offline: 1 } },
+  { id: 'SCH-N3T-112', name: 'SMAN 1 Makassar', status: 'ACTIVE', progress: 91, region: 'Sulawesi Selatan', coords: { x: 510, y: 260 }, lastUpdate: '11:08:44', health: '97%', cameras: { active: 4, offline: 0 } },
+  { id: 'SCH-3T-021', name: 'SDN 02 Entikong (3T)', status: 'ANOMALY', progress: 30, region: 'Kalimantan Barat', coords: { x: 380, y: 140 }, lastUpdate: '11:10:05', health: '65%', cameras: { active: 1, offline: 3 } },
+];
+
+const ALERTS = [
+  { id: 2, site: 'SCH-2024-012', msg: 'Structural anomaly detected', type: 'danger' },
+  { id: 3, site: 'SCH-N3T-099', msg: 'Camera feed synchronization lost', type: 'warning' },
+  { id: 4, site: 'SCH-3T-021', msg: 'Low bandwidth connection at border site', type: 'warning' },
+];
+
+// --- Sub-komponen: Panel Glassmorphism ---
+const GlassPanel = ({ children, title, icon: Icon, className = "", noPadding = false }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className={`bg-slate-900/60 backdrop-blur-md border border-cyan-500/20 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex flex-col ${className}`}
+  >
+    {title && (
+      <div className="bg-cyan-500/10 border-b border-cyan-500/20 p-3 flex items-center gap-2 flex-shrink-0">
+        <Icon size={16} className="text-cyan-400" />
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">{title}</h3>
+      </div>
+    )}
+    <div className={`${noPadding ? '' : 'p-4'} flex-1 overflow-hidden flex flex-col`}>
+      {children}
+    </div>
+  </motion.div>
+);
+
+// --- Camera Live View Component ---
+const CameraView = ({ id, label, isOffline }) => (
+  <GlassPanel className="relative !p-0 aspect-video group overflow-hidden border-cyan-500/30">
+    <div className="absolute inset-0 bg-[#050a14]">
+      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#22d3ee 0.5px, transparent 0.5px)', backgroundSize: '10px 10px' }} />
+      
+      <div className="w-full h-full flex items-center justify-center relative">
+        {!isOffline ? (
+          <>
+            {id === 1 && (
+              <div className="w-full h-full p-4 flex flex-col justify-end">
+                 <div className="w-full h-2/3 border border-cyan-500/20 bg-cyan-500/5 rounded flex items-center justify-center relative">
+                    <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-cyan-400" />
+                    <div className="absolute bottom-2 right-2 w-4 h-4 border-b border-r border-cyan-400" />
+                    <div className="text-[8px] font-mono text-cyan-400/40 tracking-widest uppercase italic">Object Detection: Active</div>
+                    <motion.div 
+                      animate={{ scale: [1, 1.05, 1], x: [0, 5, 0] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className="absolute w-12 h-20 border border-emerald-400/60 bg-emerald-400/10"
+                    />
+                 </div>
+              </div>
+            )}
+            {id === 2 && (
+              <div className="w-full h-full flex items-center justify-center">
+                 <motion.div 
+                   animate={{ rotate: 360 }}
+                   transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                   className="w-24 h-24 border border-dashed border-cyan-500/30 rounded-full flex items-center justify-center"
+                 >
+                    <div className="w-1 h-12 bg-gradient-to-t from-cyan-500 to-transparent origin-bottom" />
+                 </motion.div>
+                 <div className="absolute text-[8px] font-mono text-cyan-500/60 uppercase tracking-tighter">Scanning Main Frame</div>
+              </div>
+            )}
+            {id === 3 && (
+              <div className="w-full h-full p-2 flex flex-wrap gap-1 content-start opacity-40">
+                {Array.from({length: 8}).map((_, i) => (
+                  <div key={i} className="w-8 h-8 bg-cyan-500/10 border border-cyan-500/20 rounded flex items-center justify-center text-[8px] text-cyan-500/50 italic">{i+1}</div>
+                ))}
+                <div className="absolute inset-0 flex items-center justify-center">
+                   <div className="text-[9px] font-bold text-amber-400 animate-pulse bg-amber-400/10 px-2 py-1 border border-amber-400/30 rounded tracking-widest">SAFETY PROTOCOL CHECK</div>
+                </div>
+              </div>
+            )}
+            {id === 4 && (
+              <div className="w-full h-full flex flex-col p-4 gap-2">
+                 <div className="h-2 bg-cyan-900/40 rounded overflow-hidden"><motion.div animate={{x: ['-100%', '100%']}} transition={{duration: 2.5, repeat: Infinity}} className="w-20 h-full bg-cyan-400/50" /></div>
+                 <div className="h-2 bg-cyan-900/40 rounded overflow-hidden"><motion.div animate={{x: ['-100%', '100%']}} transition={{duration: 3, repeat: Infinity, delay: 0.5}} className="w-20 h-full bg-cyan-400/50" /></div>
+                 <div className="flex-1 flex items-center justify-center text-[8px] text-cyan-400/30 font-mono tracking-tighter">THERMAL_LOGISTICS_FLOW</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-[10px] font-mono text-red-500/40 tracking-widest uppercase italic">No Signal / Offline</div>
+        )}
+      </div>
+
+      <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-bold text-white flex items-center gap-1 shadow-lg ${isOffline ? 'bg-slate-700' : 'bg-red-600'}`}>
+        <div className={`w-1.5 h-1.5 bg-white rounded-full ${!isOffline && 'animate-pulse'}`} /> {isOffline ? 'OFFLINE' : 'LIVE'}
+      </div>
+      <div className="absolute bottom-2 left-2 text-[9px] font-mono text-white/50 bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">
+        CAM-{id}: {label}
+      </div>
+    </div>
+  </GlassPanel>
+);
+
+export default function InfrastructureDashboard() {
+  const [selectedProject, setSelectedProject] = useState(PROJECTS[0]);
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-cyan-500/30 overflow-hidden flex flex-col">
+      
+      {/* Header */}
+      <header className="h-16 border-b border-cyan-500/20 bg-slate-900/80 backdrop-blur-xl flex items-center justify-between px-6 z-50">
+        <div className="flex items-center gap-4">
+          <div className="bg-cyan-600 p-2 rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+            <Shield className="text-white" size={20} />
+          </div>
+          <h1 className="text-lg font-black tracking-tighter text-white uppercase italic">
+            MATA-KAMI
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-widest">
+          <div className="hidden md:flex gap-6 text-slate-400">
+            <span className="text-cyan-400 border-b-2 border-cyan-400 pb-5">Command Center</span>
+            <span className="hover:text-red-400 cursor-pointer pb-5 border-b-2 border-transparent transition-all text-red-500/80">Anomaly Alert ({PROJECTS.filter(p => p.status === 'ANOMALY').length})</span>
+          </div>
+          <div className="flex items-center gap-3 bg-black/40 px-4 py-1.5 rounded-full border border-white/5">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
+            <span className="text-xs font-mono text-emerald-400">{time.toLocaleTimeString()}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Layout */}
+      <main className="flex-1 grid grid-cols-12 gap-4 p-4 h-[calc(100vh-64px)] overflow-hidden">
+        
+        {/* LEFT PANEL: SITE REGISTRY */}
+        <aside className="col-span-12 lg:col-span-2 flex flex-col gap-4 overflow-y-auto scrollbar-custom">
+          <GlassPanel title="Site Registry" icon={Database} className="flex-1">
+            <div className="space-y-2">
+              {PROJECTS.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => setSelectedProject(project)}
+                  className={`w-full text-left p-2.5 rounded-lg border transition-all duration-300 group
+                    ${selectedProject.id === project.id 
+                      ? 'bg-cyan-500/20 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.1)]' 
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-[9px] font-mono text-cyan-400">{project.id}</span>
+                    <span className={`text-[7px] px-1.5 py-0.5 rounded font-black 
+                      ${project.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 
+                        project.status === 'ANOMALY' ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-slate-500/20 text-slate-400'}`}>
+                      {project.status}
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-bold text-white group-hover:text-cyan-300 transition-colors truncate">{project.name}</div>
+                  <div className="mt-2 h-1 bg-black/40 rounded-full overflow-hidden">
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${project.progress}%` }} className="h-full bg-cyan-500 shadow-[0_0_8px_#22d3ee]" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </GlassPanel>
+
+          <GlassPanel title="System Stats" icon={Zap}>
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center text-[9px]">
+                <span className="text-slate-400 font-bold uppercase">AI Uptime</span>
+                <span className="font-mono text-emerald-400">99.98%</span>
+              </div>
+              <div className="flex justify-between items-center text-[9px]">
+                <span className="text-slate-400 font-bold uppercase">Total Camera</span>
+                {/* UPDATED: Total Camera -> 3600 */}
+                <span className="font-mono text-cyan-400 italic">3,600</span>
+              </div>
+            </div>
+          </GlassPanel>
+        </aside>
+
+        {/* CENTER PANEL: MONITORING CENTER */}
+        <section className="col-span-12 lg:col-span-7 flex flex-col gap-4 overflow-y-auto scrollbar-custom">
+          
+          {/* MAP VIEW */}
+          <GlassPanel className="relative h-[360px] !p-0 border-cyan-500/40 bg-[#030712] overflow-hidden">
+            <div className="absolute inset-0">
+              <svg viewBox="0 0 800 400" className="w-full h-full opacity-80" preserveAspectRatio="xMidYMid meet">
+                <g fill="#0f172a" stroke="#1e293b" strokeWidth="0.8">
+                  <path d="M40,80 L100,105 L180,240 L140,260 L30,100 Z" />
+                  <path d="M360,120 L460,125 L460,230 L350,235 Z" />
+                  <path d="M170,275 L330,280 L320,305 L160,300 Z" />
+                  <path d="M485,150 L535,160 L530,260 L475,255 Z" />
+                  <path d="M660,195 L790,200 L785,320 L650,315 Z" />
+                </g>
+                <g stroke="#ffffff03" strokeWidth="0.4">
+                  {Array.from({length: 40}).map((_, i) => (
+                    <line key={`v-${i}`} x1={i*20} y1="0" x2={i*20} y2="400" />
+                  ))}
+                  {Array.from({length: 20}).map((_, i) => (
+                    <line key={`h-${i}`} x1="0" y1={i*20} x2="800" y2={i*20} />
+                  ))}
+                </g>
+
+                {PROJECTS.map((site) => (
+                  <g key={site.id} onClick={() => setSelectedProject(site)} className="cursor-pointer group">
+                    {site.status === 'ANOMALY' && (
+                      <circle cx={site.coords.x} cy={site.coords.y} r="10" fill="none" stroke="#ef4444" strokeWidth="1" className="animate-[ping_1.5s_infinite]" />
+                    )}
+                    {site.id === selectedProject.id && (
+                      <circle cx={site.coords.x} cy={site.coords.y} r="14" fill="none" stroke="#22d3ee" strokeWidth="0.5" className="animate-ping" />
+                    )}
+                    <circle 
+                      cx={site.coords.x} 
+                      cy={site.coords.y} 
+                      r={site.id === selectedProject.id ? "5" : "3.5"} 
+                      fill={site.status === 'ACTIVE' ? '#22d3ee' : site.status === 'ANOMALY' ? '#ef4444' : '#64748b'} 
+                      className={`transition-all duration-300 ${site.status === 'ANOMALY' ? 'animate-pulse' : ''} shadow-[0_0_10px_rgba(34,211,238,0.5)]`}
+                    />
+                    <circle cx={site.coords.x} cy={site.coords.y} r="15" fill="transparent" />
+                  </g>
+                ))}
+              </svg>
+              
+              <div className="absolute top-4 left-4 space-y-2 pointer-events-none">
+                <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-cyan-500/30 shadow-2xl min-w-[220px]">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[9px] font-mono text-cyan-400">TRACKING_TARGET_NODES</span>
+                    <Crosshair size={10} className="text-cyan-500" />
+                  </div>
+                  <h2 className="text-sm font-black text-white leading-tight uppercase truncate">{selectedProject.name}</h2>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">Status: <span className={selectedProject.status === 'ANOMALY' ? 'text-red-400' : 'text-cyan-400'}>{selectedProject.status}</span></span>
+                    <div className="flex items-center gap-3 mt-1 pt-1 border-t border-white/5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="text-[9px] font-mono text-emerald-400">AKTIF: {selectedProject.cameras.active}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        <span className="text-[9px] font-mono text-red-400">MATI: {selectedProject.cameras.offline}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent h-16 w-full animate-[scan_8s_linear_infinite] pointer-events-none" />
+            </div>
+          </GlassPanel>
+
+          <div className="grid grid-cols-2 gap-4">
+            <CameraView id={1} label="Area Utama" isOffline={selectedProject.status === 'OFFLINE'} />
+            <CameraView id={2} label="Gerbang Depan" isOffline={selectedProject.status === 'OFFLINE'} />
+            <CameraView id={3} label="Koridor Kelas" isOffline={selectedProject.status === 'OFFLINE'} />
+            <CameraView id={4} label="Lapangan / Kantin" isOffline={selectedProject.status === 'OFFLINE'} />
+          </div>
+
+          <GlassPanel title="AI Deep Analysis" icon={Cpu}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                   <div className="w-1 h-1 rounded-full bg-cyan-500" /> Blueprint Reference
+                </div>
+                <div className="aspect-video bg-white/5 rounded-lg border border-dashed border-white/20 flex items-center justify-center opacity-30">
+                  <svg viewBox="0 0 100 60" className="w-1/2 stroke-cyan-400 fill-none">
+                    <rect x="10" y="10" width="80" height="40" strokeWidth="0.5" />
+                    <line x1="10" y1="10" x2="90" y2="50" strokeWidth="0.2" />
+                  </svg>
+                </div>
+              </div>
+              <div className="space-y-2 relative">
+                <div className="text-[8px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                  <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse" /> Live Scanning Output
+                </div>
+                <div className="aspect-video bg-black rounded-lg border border-cyan-500/30 relative overflow-hidden">
+                  <div className="absolute top-0 w-full h-1 bg-cyan-400 animate-[scan_4s_linear_infinite] opacity-50" />
+                  <div className="absolute bottom-2 right-2 bg-slate-900/90 p-2 rounded text-[8px] border border-cyan-500/20">
+                    <div className="text-emerald-400 font-mono">Detection Log: {selectedProject.status === 'OFFLINE' ? '--' : 'Person Detected'}</div>
+                    <div className="text-cyan-400 font-mono">Confidence: {selectedProject.status === 'OFFLINE' ? '0%' : '98.8%'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassPanel>
+        </section>
+
+        {/* RIGHT PANEL: COMMAND & CONTROL */}
+        <aside className="col-span-12 lg:col-span-3 flex flex-col gap-4 overflow-hidden h-full">
+          
+          <GlassPanel title="Infrastruktur Stats" icon={TrendingUp}>
+            <div className="space-y-4">
+              <div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase mb-1">Total Sekolah Terkoneksi</div>
+                <div className="text-2xl font-black text-white">{PROJECTS.length} <span className="text-cyan-400 text-sm">Site</span></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-white/5 rounded border border-white/10">
+                    <div className="text-[8px] text-slate-500 uppercase">3T Region</div>
+                    <div className="text-xs font-bold text-white">5 Sites</div>
+                </div>
+                <div className="p-2 bg-white/5 rounded border border-white/10">
+                    <div className="text-[8px] text-slate-500 uppercase">Non-3T Region</div>
+                    <div className="text-xs font-bold text-white">6 Sites</div>
+                </div>
+              </div>
+            </div>
+          </GlassPanel>
+
+          <GlassPanel title="Active Alerts" icon={AlertTriangle}>
+            <div className="space-y-2.5 max-h-32 overflow-y-auto pr-1 scrollbar-custom">
+              {ALERTS.length > 0 ? ALERTS.map(alert => (
+                <div key={alert.id} className="p-2.5 bg-red-500/5 border border-red-500/20 rounded-lg group hover:bg-red-500/15 transition-all">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[8px] font-black text-red-500 uppercase tracking-widest font-mono">{alert.site}</span>
+                    <Radio size={10} className="text-red-500 animate-pulse" />
+                  </div>
+                  <div className="text-[10px] font-bold text-white mb-2 leading-tight">{alert.msg}</div>
+                  <button className="w-full py-1.5 bg-red-600/10 border border-red-600/30 text-red-400 text-[8px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all rounded">
+                    TANGGAPI
+                  </button>
+                </div>
+              )) : (
+                <div className="text-[9px] text-slate-500 italic text-center py-4">No critical alerts detected</div>
+              )}
+            </div>
+          </GlassPanel>
+
+          {/* UPDATED: Site Database (Realtime) - Added Active/Offline Cam Cols */}
+          <GlassPanel title="Site Database (Realtime)" icon={List} noPadding className="flex-1 min-h-0">
+            <div className="h-full flex flex-col overflow-hidden">
+              <div className="overflow-auto scrollbar-custom p-1">
+                <table className="w-full text-left border-collapse min-w-[500px]">
+                  <thead className="sticky top-0 bg-[#0f172a] z-10 border-b border-cyan-500/30">
+                    <tr className="text-[8px] font-black text-cyan-400 uppercase tracking-tighter">
+                      <th className="px-3 py-2 whitespace-nowrap">Site ID</th>
+                      <th className="px-3 py-2 whitespace-nowrap">Status</th>
+                      <th className="px-3 py-2 whitespace-nowrap">Progress</th>
+                      {/* Detailed Cam Status Columns */}
+                      <th className="px-3 py-2 whitespace-nowrap text-emerald-500">Cam Aktif</th>
+                      <th className="px-3 py-2 whitespace-nowrap text-red-500">Cam Mati</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[9px] font-mono">
+                    {PROJECTS.map((site) => (
+                      <tr key={site.id} 
+                        onClick={() => setSelectedProject(site)}
+                        className={`border-b border-white/5 hover:bg-cyan-500/10 cursor-pointer transition-colors ${selectedProject.id === site.id ? 'bg-cyan-500/5' : ''}`}>
+                        <td className="px-3 py-3 font-bold text-white whitespace-nowrap">{site.id}</td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className={`px-1.5 py-0.5 rounded text-[7px] font-black uppercase ${site.status === 'ACTIVE' ? 'text-emerald-400' : site.status === 'ANOMALY' ? 'text-red-400' : 'text-slate-400'}`}>
+                            {site.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-1 bg-black rounded-full overflow-hidden">
+                              <div className="h-full bg-cyan-500" style={{ width: `${site.progress}%` }} />
+                            </div>
+                            <span className="text-slate-300">{site.progress}%</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap text-emerald-400 font-bold bg-emerald-500/5">{site.cameras.active}</td>
+                        <td className="px-3 py-3 whitespace-nowrap text-red-500 font-bold bg-red-500/5">{site.cameras.offline}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="bg-cyan-500/5 p-2 text-[8px] text-cyan-400/60 font-mono flex justify-between items-center border-t border-cyan-500/10 flex-shrink-0">
+                <span>TOTAL_SITES: {PROJECTS.length}</span>
+                <span className="flex gap-4">
+                  <span className="text-emerald-400">AKTIF: {PROJECTS.reduce((acc, curr) => acc + curr.cameras.active, 0)}</span>
+                  <span className="text-red-400">OFFLINE: {PROJECTS.reduce((acc, curr) => acc + curr.cameras.offline, 0)}</span>
+                </span>
+              </div>
+            </div>
+          </GlassPanel>
+        </aside>
+
+      </main>
+
+      <style>{`
+        @keyframes scan {
+          from { transform: translateY(-100%); }
+          to { transform: translateY(600%); }
+        }
+        
+        .scrollbar-custom::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.5);
+        }
+        .scrollbar-custom::-webkit-scrollbar-thumb {
+          background: rgba(34, 211, 238, 0.2);
+          border-radius: 10px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 211, 238, 0.4);
+        }
+
+        table {
+          border-spacing: 0;
+        }
+      `}</style>
+    </div>
+  );
+}
